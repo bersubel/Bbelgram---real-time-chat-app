@@ -1,69 +1,133 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useEffect } from 'react'
+import { createClient } from '@/utils/supabase/client'
+import { useRouter } from 'next/navigation'
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [notification, setNotification] = useState<{ type: 'error' | 'success', message: string } | null>(null)
+  
+  // NEW: State to trigger the full-screen splash animation
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    setNotification(null)
+  }, [isSignUp])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email || !password) {
+      setNotification({ type: 'error', message: 'Please enter both email and password.' })
+      return
+    }
+
+    setLoading(true)
+    setNotification(null)
+
+    if (isSignUp) {
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        setNotification({ type: 'error', message: error.message })
+        setLoading(false)
+      } else if (!data.session) {
+        setNotification({ type: 'error', message: "Account already exists. Try switching to Sign In!" })
+        setLoading(false)
+      } else {
+        // Trigger Animation, wait 1.5s, then route
+        setIsTransitioning(true)
+        setTimeout(() => router.push('/chat'), 1500)
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setNotification({ type: 'error', message: 'Invalid email or password.' })
+        setLoading(false)
+      } else {
+        // Trigger Animation, wait 1.5s, then route
+        setIsTransitioning(true)
+        setTimeout(() => router.push('/chat'), 1500)
+      }
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+    <>
+      {/* THE SPLASH SCREEN TRANSITION OVERLAY */}
+      {isTransitioning && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0e1621] transition-opacity duration-500">
+          <div className="relative h-28 w-28 animate-bounce">
+            <div className="absolute inset-0 rounded-full bg-[#5293d9] blur-xl opacity-40 animate-pulse"></div>
+            <img 
+              src="/Bbelgram-logo.png" 
+              alt="Bbelgram Logo" 
+              className="relative h-full w-full object-cover rounded-full shadow-2xl"
+              onError={(e) => { (e.target as HTMLImageElement).src = '/Bbelgram-logo.jpg' }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
+          <h1 className="mt-6 text-2xl font-bold tracking-widest text-white animate-pulse">
+            Bbelgram
+          </h1>
         </div>
-      </main>
-    </div>
-  );
+      )}
+
+      {/* NORMAL LOGIN PAGE (Hidden when transitioning) */}
+      <div className={`flex min-h-screen items-center justify-center bg-slate-50 p-4 font-sans text-slate-800 ${isTransitioning ? 'hidden' : ''}`}>
+        <div className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:p-10">
+          
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full shadow-lg shadow-sky-500/10">
+              <img 
+                src="/Bbelgram-logo.png" 
+                alt="Bbelgram Logo" 
+                className="h-full w-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).src = '/Bbelgram-logo.jpg' }}
+              />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Bbelgram
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              {isSignUp ? 'Create a new account' : 'Sign in to your account'}
+            </p>
+          </div>
+
+          {notification && (
+            <div className={`mb-6 rounded-xl p-4 text-sm font-medium ${notification.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+              {notification.message}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="hello@example.com" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-sm outline-none transition-all focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-sm outline-none transition-all focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10" />
+            </div>
+            <button type="submit" disabled={loading} className="mt-2 w-full rounded-xl bg-sky-500 p-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-sky-600 focus:outline-none focus:ring-4 focus:ring-sky-500/30 disabled:opacity-60">
+              {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            </button>
+          </form>
+
+          <div className="mt-8 text-center text-sm text-slate-500">
+            {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+            <button onClick={() => setIsSignUp(!isSignUp)} className="font-semibold text-sky-500 hover:text-sky-600 hover:underline outline-none">
+              {isSignUp ? 'Log in instead' : 'Sign up'}
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </>
+  )
 }
