@@ -64,7 +64,6 @@ export default function ChatList({ currentUser, activeTab, activeChatId, setActi
           const chatMsgs = (messages || []).filter(m => m.chat_id === chat.id)
           const latestMsg = chatMsgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
           
-          // Calculate unread messages (messages sent by others where is_read is false)
           const unreadCount = chatMsgs.filter(m => m.sender_id !== currentUser.id && m.is_read === false).length
 
           let name = chat.group_name
@@ -73,7 +72,6 @@ export default function ChatList({ currentUser, activeTab, activeChatId, setActi
           if (!chat.is_group) {
             const otherMember = allMembers.find(m => m.chat_id === chat.id && m.user_id !== currentUser.id)
             
-            // Deduplication Check: If we already have a direct chat with this user, skip showing the duplicate
             if (otherMember) {
               if (seenUsers.has(otherMember.user_id)) return 
               seenUsers.add(otherMember.user_id)
@@ -89,7 +87,6 @@ export default function ChatList({ currentUser, activeTab, activeChatId, setActi
           formattedChats.push({ ...chat, display_name: name, avatar_url: avatar, latestMsg, unreadCount })
         })
 
-        // Sort by most recent message
         formattedChats.sort((a, b) => {
           const timeA = a.latestMsg ? new Date(a.latestMsg.created_at).getTime() : new Date(a.updated_at || a.created_at || 0).getTime()
           const timeB = b.latestMsg ? new Date(b.latestMsg.created_at).getTime() : new Date(b.updated_at || b.created_at || 0).getTime()
@@ -119,11 +116,11 @@ export default function ChatList({ currentUser, activeTab, activeChatId, setActi
   }, [currentUser.id, supabase, refreshTrigger])
 
   const filteredChats = chats.filter(chat => {
-    // Cast activeTab as string here
     const matchesTab = (activeTab as string) === 'all' || (activeTab === 'personal' && !chat.is_group) || (activeTab === 'groups' && chat.is_group)
     const matchesSearch = chat.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesTab && matchesSearch
   })
+
   const formatTime = (dateString?: string) => {
     if (!dateString) return ''
     try {
@@ -139,14 +136,11 @@ export default function ChatList({ currentUser, activeTab, activeChatId, setActi
     }
   }
 
-  // Handle clicking a chat
   const handleChatClick = async (chatId: string) => {
     setActiveChatId(chatId)
 
-    // Instantly mark as read in UI
     setChats(prev => prev.map(c => c.id === chatId ? { ...c, unreadCount: 0 } : c))
 
-    // Mark as read in Database
     await supabase
       .from('messages')
       .update({ is_read: true })
@@ -282,7 +276,6 @@ export default function ChatList({ currentUser, activeTab, activeChatId, setActi
                   </p>
                 </div>
 
-                {/* Right Side: Time and Unread Badge */}
                 <div className="flex flex-col items-end justify-between ml-2 shrink-0 space-y-1.5 min-w-[40px]">
                   <span className={`text-[12px] ${isActive ? 'text-blue-200' : 'text-[#7f91a4]'}`}>
                     {formatTime(msg?.created_at || chat.updated_at || chat.created_at)}
@@ -303,34 +296,34 @@ export default function ChatList({ currentUser, activeTab, activeChatId, setActi
       {/* Floating Action Button (New Chat) */}
       <button 
         onClick={() => setShowAddContact(true)}
-        className="absolute bottom-6 right-6 w-14 h-14 bg-[#5293d9] hover:bg-[#4784c4] text-white rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 z-20"
+        className="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 w-[54px] h-[54px] bg-[#5293d9] hover:bg-[#4784c4] text-white rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 z-40"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
         </svg>
       </button>
 
-      {/* Add Contact Modal */}
+      {/* Add Contact Modal - FIXED FOR MOBILE */}
       {showAddContact && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-[#17212b] w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-[#242f3d]">
-            <h2 className="text-white font-semibold text-[18px] mb-4">New Message</h2>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#17212b] w-full max-w-[320px] sm:max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl border border-[#242f3d] mb-[10vh] sm:mb-0">
+            <h2 className="text-white font-semibold text-[17px] sm:text-[18px] mb-4">New Message</h2>
             <form onSubmit={handleAddContact}>
-              <div className="flex items-center bg-[#242f3d] rounded-xl px-3 py-2 focus-within:border-[#5293d9] border border-transparent transition-colors">
-                <span className="text-[#7f91a4] mr-1">@</span>
+              <div className="flex items-center bg-[#242f3d] rounded-xl px-3 py-2 sm:py-2.5 focus-within:border-[#5293d9] border border-transparent transition-colors">
+                <span className="text-[#7f91a4] mr-2">@</span>
                 <input
                   type="text"
                   value={contactUsername}
                   onChange={(e) => setContactUsername(e.target.value)}
                   placeholder="username"
-                  className="flex-1 bg-transparent border-none text-white outline-none text-[15px]"
+                  className="flex-1 bg-transparent border-none text-white outline-none text-[14px] sm:text-[15px]"
                   autoFocus
                 />
               </div>
-              {addError && <p className="text-red-400 text-[13px] mt-2">{addError}</p>}
-              <div className="flex justify-end gap-2 mt-6">
-                <button type="button" onClick={() => setShowAddContact(false)} className="px-4 py-2 text-white hover:bg-[#242f3d] rounded-lg transition-colors text-[14px]">Cancel</button>
-                <button type="submit" disabled={isAdding || !contactUsername.trim()} className="px-4 py-2 bg-[#5293d9] hover:bg-[#4784c4] text-white rounded-lg transition-colors text-[14px] disabled:opacity-50">
+              {addError && <p className="text-red-400 text-[12px] sm:text-[13px] mt-2">{addError}</p>}
+              <div className="flex justify-end gap-2 mt-5 sm:mt-6">
+                <button type="button" onClick={() => setShowAddContact(false)} className="px-3 sm:px-4 py-1.5 sm:py-2 text-white hover:bg-[#242f3d] rounded-lg transition-colors text-[13px] sm:text-[14px]">Cancel</button>
+                <button type="submit" disabled={isAdding || !contactUsername.trim()} className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#5293d9] hover:bg-[#4784c4] text-white rounded-lg transition-colors text-[13px] sm:text-[14px] disabled:opacity-50">
                   {isAdding ? 'Searching...' : 'Start Chat'}
                 </button>
               </div>

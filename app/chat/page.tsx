@@ -9,7 +9,7 @@ import FolderSidebar from '@/components/sidebar/FolderSidebar'
 import HamburgerMenu from '@/components/modals/HamburgerMenu'
 import ChatList from '@/components/sidebar/ChatList'
 import ChatHeader from '@/components/chat/ChatHeader'
-import MessageList from '@/components/chat/MessageList'
+import MessageList, { ExtendedMessage } from '@/components/chat/MessageList'
 import MessageInput from '@/components/chat/MessageInput'
 import CallModal from '@/components/modals/CallModal'
 import SettingsPanel from '@/components/sidebar/SettingsPanel'
@@ -25,9 +25,10 @@ export default function ChatPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   
-  // New state for logout transition
+  // Transitions and UI state
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [replyingTo, setReplyingTo] = useState<ExtendedMessage | null>(null)
 
   const [showSettings, setShowSettings] = useState(false)
   const [showNewGroup, setShowNewGroup] = useState(false)
@@ -82,14 +83,12 @@ export default function ChatPage() {
   }, [currentUser, supabase])
 
   const handleLogout = async () => {
-    // 1. Close menus and start transition animation
     setIsMenuOpen(false)
     setIsTransitioning(true)
     
-    // 2. Wait 1.5 seconds for animation, then actually sign out and redirect
     setTimeout(async () => {
       await supabase.auth.signOut()
-      window.location.href = '/' // Hard redirect clears all caches and WebSockets
+      window.location.href = '/' 
     }, 1500)
   }
 
@@ -108,81 +107,82 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen w-full bg-[#0e1621] text-white font-sans overflow-hidden relative">
       
-      {/* LOGOUT SPLASH SCREEN TRANSITION */}
+      {/* LOGOUT SPLASH SCREEN */}
       {isTransitioning && (
         <div className="absolute inset-0 z-[10000] flex flex-col items-center justify-center bg-[#0e1621] transition-opacity duration-500">
           <div className="relative h-28 w-28 animate-bounce">
             <div className="absolute inset-0 rounded-full bg-[#5293d9] blur-xl opacity-40 animate-pulse"></div>
             <img 
-              src="/Bbelgram-logo.png" 
-              alt="Bbelgram Logo" 
+              src="/Bbelgram-logo.png" alt="Bbelgram Logo" 
               className="relative h-full w-full object-cover rounded-full shadow-2xl"
-              onError={(e) => { (e.target as HTMLImageElement).src = '/Bbelgram-logo.jpg' }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://ui-avatars.com/api/?name=Bbelgram&background=5293d9&color=fff'; }}
             />
           </div>
-          <h1 className="mt-6 text-2xl font-bold tracking-widest text-white animate-pulse">
-            Logging out...
-          </h1>
+          <h1 className="mt-6 text-2xl font-bold tracking-widest text-white animate-pulse">Logging out...</h1>
         </div>
       )}
       
-      <FolderSidebar activeTab={activeTab} setActiveTab={setActiveTab} isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+      {/* FOLDER SIDEBAR: Hidden on mobile when a chat is open */}
+      <div className={`${activeChatId ? 'hidden md:flex' : 'flex'} shrink-0 z-20`}>
+        <FolderSidebar activeTab={activeTab} setActiveTab={setActiveTab} isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+      </div>
       
       {isMenuOpen && currentUser && (
         <HamburgerMenu 
-          currentUser={currentUser} 
-          setIsMenuOpen={setIsMenuOpen} 
-          handleLogout={handleLogout} 
-          onOpenSettings={() => {
-            setShowSettings(true)
-            setIsMenuOpen(false) 
-          }}
-          onOpenNewGroup={() => {
-            setShowNewGroup(true)
-            setIsMenuOpen(false)
-          }}
+          currentUser={currentUser} setIsMenuOpen={setIsMenuOpen} handleLogout={handleLogout} 
+          onOpenSettings={() => { setShowSettings(true); setIsMenuOpen(false); }}
+          onOpenNewGroup={() => { setShowNewGroup(true); setIsMenuOpen(false); }}
         />
       )}
 
-      {/* Render New Group Modal if active */}
       {showNewGroup && currentUser && (
         <NewGroupModal 
-          currentUser={currentUser} 
-          onClose={() => setShowNewGroup(false)} 
-          onGroupCreated={(newChatId) => {
-            setShowNewGroup(false)
-            setActiveChatId(newChatId)
-            setActiveTab('groups')
-          }} 
+          currentUser={currentUser} onClose={() => setShowNewGroup(false)} 
+          onGroupCreated={(newChatId) => { setShowNewGroup(false); setActiveChatId(newChatId); setActiveTab('groups'); }} 
         />
       )}
 
-      <div className="w-[320px] bg-[#17212b] border-r border-[#101925] flex flex-col shrink-0 relative z-10 overflow-hidden">
+      {/* CHAT LIST / SETTINGS SIDEBAR: Hidden on mobile when a chat is open, Full width otherwise */}
+      <div className={`${activeChatId ? 'hidden md:flex' : 'flex flex-1'} md:w-[320px] bg-[#17212b] border-r border-[#101925] flex-col shrink-0 relative z-10 overflow-hidden`}>
         {showSettings && currentUser ? (
           <SettingsPanel 
-            currentUser={currentUser} 
-            onClose={() => setShowSettings(false)} 
+            currentUser={currentUser} onClose={() => setShowSettings(false)} 
             onProfileUpdated={(updated) => setCurrentUser(updated)}
           />
         ) : (
           currentUser && (
             <ChatList 
-              currentUser={currentUser} 
-              activeTab={activeTab} 
-              activeChatId={activeChatId} 
-              setActiveChatId={setActiveChatId} 
+              currentUser={currentUser} activeTab={activeTab} 
+              activeChatId={activeChatId} setActiveChatId={setActiveChatId} 
             />
           )
         )}
       </div>
 
-      <div className="flex-1 flex flex-col bg-[#0e1621] relative z-0">
+      {/* CHAT AREA: Hidden on mobile when NO chat is open, Full width when opened */}
+      <div className={`${!activeChatId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-[#0e1621] relative z-0`}>
         {activeChatId && currentUser ? (
           <div className="flex-1 flex flex-col h-full bg-[url('https://telegram.org/file/464001088/1/5bU4AGF6_0w.166164/5ff00609b53299cff3')] bg-cover bg-center bg-fixed bg-no-repeat bg-[#0e1621] bg-blend-overlay">
             
-            <ChatHeader chatId={activeChatId} currentUser={currentUser} onStartCall={handleStartCall} />
-            <MessageList key={`${activeChatId}-${refreshKey}`} chatId={activeChatId} currentUser={currentUser} />
-            <MessageInput chatId={activeChatId} currentUser={currentUser} onMessageSent={() => setRefreshKey(prev => prev + 1)} />
+            <ChatHeader 
+              chatId={activeChatId} 
+              currentUser={currentUser} 
+              onStartCall={handleStartCall}
+              onBack={() => setActiveChatId(null)} // <-- Mobile Back action!
+            />
+            <MessageList 
+              key={`${activeChatId}-${refreshKey}`} 
+              chatId={activeChatId} 
+              currentUser={currentUser} 
+              onReply={(msg) => setReplyingTo(msg)}
+            />
+            <MessageInput 
+              chatId={activeChatId} 
+              currentUser={currentUser} 
+              replyingTo={replyingTo}
+              onCancelReply={() => setReplyingTo(null)}
+              onMessageSent={() => { setRefreshKey(prev => prev + 1); setReplyingTo(null); }} 
+            />
             
           </div>
         ) : (
@@ -194,18 +194,14 @@ export default function ChatPage() {
         )}
       </div>
 
+      {/* CALL MODAL (Independent overlay layer) */}
       {activeCall && currentUser && (
         <CallModal 
-          chatId={activeCall.chatId}
-          currentUser={currentUser}
-          callType={activeCall.type}
-          chatName={activeCall.name}
-          chatAvatar={activeCall.avatar}
-          incomingCallId={activeCall.incomingCallId}
+          chatId={activeCall.chatId} currentUser={currentUser} callType={activeCall.type}
+          chatName={activeCall.name} chatAvatar={activeCall.avatar} incomingCallId={activeCall.incomingCallId}
           onClose={() => setActiveCall(null)}
         />
       )}
-
     </div>
   )
 }
